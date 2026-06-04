@@ -1,0 +1,391 @@
+Good, your flow is clear now:
+
+### Flow you want
+
+1. Interface screen → user clicks **Multicast**
+2. Address book opens
+3. User sees 10 entries (from flash parsing)
+4. User selects **max 5 entries via checkbox**
+5. User can also **unselect anytime**
+6. Press **Done → selected data is extracted**
+
+---
+
+## 🔴 Key Improvement (Important)
+
+You should NOT write separate logic per checkbox.
+
+Instead:
+
+* Use **ONE handler function**
+* Pass **index (0–9)** from each checkbox event
+
+---
+
+# ✅ GLOBAL VARIABLES
+
+```c id="gbl1"
+#define MAX_SELECT 5
+#define TOTAL_ENTRY 10
+
+uint8_t selected_index[MAX_SELECT];
+uint8_t selected_count = 0;
+
+uint8_t checkbox_state[TOTAL_ENTRY] = {0};   // 0 = unchecked, 1 = checked
+```
+
+---
+
+# ✅ COMMON FUNCTION (CORE LOGIC)
+
+```c id="core1"
+void AddressBook_SelectHandler(uint8_t index, uint8_t state)
+{
+    uint8_t i, j;
+
+    /* CHECKED */
+    if(state == 1)
+    {
+        /* already selected? ignore */
+        for(i = 0; i < selected_count; i++)
+        {
+            if(selected_index[i] == index)
+                return;
+        }
+
+        /* max limit check */
+        if(selected_count >= MAX_SELECT)
+        {
+            /* UI feedback: max 5 allowed */
+
+            /* force uncheck UI checkbox if API supports */
+            checkbox_state[index] = 0;
+            return;
+        }
+
+        selected_index[selected_count++] = index;
+        checkbox_state[index] = 1;
+    }
+
+    /* UNCHECKED */
+    else
+    {
+        for(i = 0; i < selected_count; i++)
+        {
+            if(selected_index[i] == index)
+            {
+                for(j = i; j < selected_count - 1; j++)
+                {
+                    selected_index[j] = selected_index[j + 1];
+                }
+
+                selected_count--;
+                break;
+            }
+        }
+
+        checkbox_state[index] = 0;
+    }
+}
+```
+
+---
+
+# ✅ CHECKBOX EVENT FUNCTIONS (ALL 10)
+
+### Checkbox 0
+
+```c id="cb0"
+void cb0_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(0, checked);
+}
+```
+
+### Checkbox 1
+
+```c id="cb1"
+void cb1_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(1, checked);
+}
+```
+
+### Checkbox 2
+
+```c id="cb2"
+void cb2_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(2, checked);
+}
+```
+
+### Checkbox 3
+
+```c id="cb3"
+void cb3_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(3, checked);
+}
+```
+
+### Checkbox 4
+
+```c id="cb4"
+void cb4_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(4, checked);
+}
+```
+
+### Checkbox 5
+
+```c id="cb5"
+void cb5_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(5, checked);
+}
+```
+
+### Checkbox 6
+
+```c id="cb6"
+void cb6_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(6, checked);
+}
+```
+
+### Checkbox 7
+
+```c id="cb7"
+void cb7_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(7, checked);
+}
+```
+
+### Checkbox 8
+
+```c id="cb8"
+void cb8_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(8, checked);
+}
+```
+
+### Checkbox 9
+
+```c id="cb9"
+void cb9_event(leCheckboxWidget* btn, leBool checked)
+{
+    AddressBook_SelectHandler(9, checked);
+}
+```
+
+---
+
+# ✅ DONE BUTTON EVENT (FINAL SELECTION USE)
+
+Now extract selected data:
+
+```c id="done1"
+void Done_Button_Event(void)
+{
+    uint8_t i;
+    uint8_t idx;
+
+    for(i = 0; i < selected_count; i++)
+    {
+        idx = selected_index[i];
+
+        /* Extract parsed address book data */
+        printf("Name: %s\n", address_book_name + (idx * 10));
+        printf("IP  : %s\n", address_book_ip + (idx * 4));
+        printf("ID  : %s\n", address_book_id + (idx * 10));
+    }
+}
+```
+
+---
+
+# 🔥 IMPORTANT FIX IN YOUR PARSING CODE
+
+Your loops are incorrect here:
+
+```c
+for(i=0;i<10;i++) address_book_display_entry_buf[j++]=address_book_name[j]
+```
+
+👉 You are mixing `i` and `j`
+
+Correct idea:
+
+```c id="fix1"
+for(i = 0; i < 10; i++)
+    address_book_display_entry_buf[i] = address_book_name[i];
+
+for(i = 0; i < 4; i++)
+    address_book_display_entry_buf[10 + i] = address_book_ip[i];
+
+for(i = 0; i < 10; i++)
+    address_book_display_entry_buf[14 + i] = address_book_id[i];
+```
+
+---
+
+# ✅ FINAL RESULT
+
+✔ Any checkbox can be selected
+✔ Any checkbox can be deselected
+✔ Max 5 selection enforced
+✔ Clean reusable logic
+✔ No duplicate code
+✔ Scales easily if you increase from 10 → 100 entries
+
+---
+
+If you want next step, I can help you improve this further:
+
+✔ highlight selected rows in UI
+✔ auto-disable remaining checkboxes after 5 selection
+✔ store selection permanently
+✔ send multicast packets using selected IP list
+
+
+
+
+
+
+Yes — for **Done event**, you can directly use `sprintf()` / `snprintf()` to copy IP and ID into a transmit buffer. That is a clean and common Embedded C approach.
+
+But there is an important correction:
+👉 you must use the **selected index (idx)**, not the full array directly.
+
+---
+
+# ✅ Correct Done Event (IP + ID extraction only)
+
+```c id="done_ip_id"
+void Done_Button_Event(void)
+{
+    uint8_t i;
+    uint8_t idx;
+
+    char tx_buffer[64];
+
+    for(i = 0; i < selected_count; i++)
+    {
+        idx = selected_index[i];
+
+        /* Extract IP */
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "IP:%s,", address_book_ip + (idx * 16));
+
+        /* send or store tx_buffer */
+        send_data(tx_buffer);
+
+        /* Extract ID */
+        snprintf(tx_buffer, sizeof(tx_buffer),
+                 "ID:%s\r\n", address_book_id + (idx * 10));
+
+        send_data(tx_buffer);
+    }
+}
+```
+
+---
+
+# 🔴 Important Notes (very critical in embedded)
+
+## 1. Why NOT this?
+
+```c
+sprintf(buffer ,"%s", address_book_ip);
+```
+
+❌ Problem:
+
+* It always takes **only first entry**
+* No index used
+* Can overflow buffer (unsafe)
+
+---
+
+## 2. Correct approach (your case)
+
+You must always do:
+
+```c
+address_book_ip + (idx * IP_SIZE)
+address_book_id + (idx * ID_SIZE)
+```
+
+Because your data is stored in **flattened buffer format**, not array of strings.
+
+---
+
+# ✅ Safer version (recommended)
+
+Use `snprintf` always:
+
+```c id="safe_done"
+snprintf(tx_buffer, sizeof(tx_buffer), "%s", address_book_ip + (idx * 16));
+```
+
+or direct send:
+
+```c id="direct_send"
+send_data(address_book_ip + (idx * 16));
+```
+
+---
+
+# ✅ Even better design (recommended upgrade)
+
+Instead of pointer math like:
+
+```c
+address_book_ip + (idx * 16)
+```
+
+Create struct:
+
+```c id="struct_best"
+typedef struct
+{
+    char name[10];
+    char ip[16];
+    char id[10];
+} AddressBook_t;
+
+AddressBook_t address_book[10];
+```
+
+Then Done becomes:
+
+```c id="clean_done"
+snprintf(tx_buffer, sizeof(tx_buffer),
+         "IP:%s,ID:%s\r\n",
+         address_book[idx].ip,
+         address_book[idx].id);
+```
+
+---
+
+# 🔥 Summary
+
+* ✔ Use `selected_index[]` always
+* ✔ Use `snprintf()` not `sprintf()`
+* ✔ Always apply `(idx * size)` for flat buffers
+* ✔ Best solution → convert to `struct`
+
+---
+
+If you want, I can next help you:
+✔ send all selected IPs as multicast packet format
+✔ build packet structure for UART/Ethernet
+✔ optimize memory for embedded (very important for MPLAB/PIC32)
+
+
+
