@@ -1,0 +1,119 @@
+Use an array of label widget pointers. This lets you access each label using its row number instead of writing separate if conditions.
+
+For example, if multicast_buffer contains:
+"12345|456|859"
+
+
+the code will show only labels 1, 2 and 3, and hide labels 4 and 5.
+1. Create arrays for your label widgets
+Add this in your global declarations:
+#define MAX_ENTRIES 5
+#define BUFFER_SIZE 170
+#define MAX_DATA_LENGTH 32
+
+// Data labels
+leWidget *radio_eth_labels[MAX_ENTRIES] =
+{
+    (leWidget *)radio_id_eth_label_1,
+    (leWidget *)radio_id_eth_label_2,
+    (leWidget *)radio_id_eth_label_3,
+    (leWidget *)radio_id_eth_label_4,
+    (leWidget *)radio_id_eth_label_5
+};
+
+// Sent status labels
+leWidget *sent_labels[MAX_ENTRIES] =
+{
+    (leWidget *)sent_status_label_1,
+    (leWidget *)sent_status_label_2,
+    (leWidget *)sent_status_label_3,
+    (leWidget *)sent_status_label_4,
+    (leWidget *)sent_status_label_5
+};
+
+// Delivered status labels
+leWidget *delivered_labels[MAX_ENTRIES] =
+{
+    (leWidget *)delivered_status_label_1,
+    (leWidget *)delivered_status_label_2,
+    (leWidget *)delivered_status_label_3,
+    (leWidget *)delivered_status_label_4,
+    (leWidget *)delivered_status_label_5
+};
+
+char send_data[MAX_ENTRIES][MAX_DATA_LENGTH];
+
+int send_count = 0;
+
+
+Use your actual generated widget variable names for the Sent and Delivered labels if they differ.
+2. Send button callback
+This code:
+1. Hides all 5 rows initially.
+2. Extracts individual data using |.
+3. Shows only the required labels.
+4. Initializes Sent and Delivered labels for those rows.
+void SendButton_Callback(void)
+{
+    char temp[BUFFER_SIZE];
+    char *token;
+
+    int i;
+
+    send_count = 0;
+
+    // Copy multicast buffer
+    strcpy(temp, multicast_buffer);
+
+    // Hide all 5 rows
+    for(i = 0; i < MAX_ENTRIES; i++)
+    {
+        fn->setVisible(radio_eth_labels[i], LE_FALSE);
+        fn->setVisible(sent_labels[i], LE_FALSE);
+        fn->setVisible(delivered_labels[i], LE_FALSE);
+    }
+
+    // Extract individual data
+    token = strtok(temp, "|");
+
+    while(token != NULL && send_count < MAX_ENTRIES)
+    {
+        if(strlen(token) >= MAX_DATA_LENGTH)
+            break;
+
+        // Store extracted data
+        strcpy(send_data[send_count], token);
+
+        // Show corresponding row labels
+        fn->setVisible(radio_eth_labels[send_count], LE_TRUE);
+        fn->setVisible(sent_labels[send_count], LE_TRUE);
+        fn->setVisible(delivered_labels[send_count], LE_TRUE);
+
+        // Move to next entry
+        send_count++;
+
+        token = strtok(NULL, "|");
+    }
+}
+
+
+3. How the label selection works
+For multicast_buffer = "12345|456|859":
+Extracted data	Label displayed
+12345	radio_id_eth_label_1
+456	radio_id_eth_label_2
+859	radio_id_eth_label_3
+
+3 rows visible
+ 2 rows hidden
+
+
+The important logic is:
+fn->setVisible(radio_eth_labels[send_count], LE_TRUE);
+
+
+Here, send_count automatically selects the correct label.
+
+One important point: This code handles row visibility and extracts the data. To display 12345, 456, and 859 as the actual label text, you must also set each label's text using your generated Legato label-text API. This is separate from setVisible().
+
+Your existing UART3 sending and ACK logic can now use send_data[i] for each destination.
