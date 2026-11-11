@@ -1,0 +1,246 @@
+Below code will display the data stored in your multicast buffer in the five Label widgets. It displays only the number of labels matching the number of destinations in the buffer.
+
+For example, if your buffer contains:
+
+`12345|456|859|`
+
+Only Label 1, Label 2 and Label 3 will be visible.
+
+### 1. Display multicast buffer data
+
+```
+#define MAX_DESTINATIONS  5
+#define BUFFER_SIZE       128
+
+void displayMulticastBuffer(char *multicastBuffer)
+{
+    char destination[5][32];
+    uint8_t count = 0;
+    uint8_t i = 0;
+    uint8_t j = 0;
+
+    memset(destination, 0, sizeof(destination));
+
+    // Hide all five labels initially
+    radio_id_eth_label_1->fn->setVisible(radio_id_eth_label_1, LE_FALSE);
+    radio_id_eth_label_2->fn->setVisible(radio_id_eth_label_2, LE_FALSE);
+    radio_id_eth_label_3->fn->setVisible(radio_id_eth_label_3, LE_FALSE);
+    radio_id_eth_label_4->fn->setVisible(radio_id_eth_label_4, LE_FALSE);
+    radio_id_eth_label_5->fn->setVisible(radio_id_eth_label_5, LE_FALSE);
+
+    // Extract data separated by |
+    while (multicastBuffer[i] != '\0' && count < MAX_DESTINATIONS)
+    {
+        if (multicastBuffer[i] == '|')
+        {
+            if (j > 0)
+            {
+                destination[count][j] = '\0';
+                count++;
+                j = 0;
+            }
+        }
+        else if (j < sizeof(destination[0]) - 1)
+        {
+            destination[count][j++] = multicastBuffer[i];
+        }
+
+        i++;
+    }
+
+    // Display only the labels containing data
+    if (count >= 1)
+    {
+        radio_id_eth_label_1->fn->setVisible(radio_id_eth_label_1, LE_TRUE);
+        leLabelWidget_SetText(radio_id_eth_label_1, (leChar *)destination[0]);
+    }
+
+    if (count >= 2)
+    {
+        radio_id_eth_label_2->fn->setVisible(radio_id_eth_label_2, LE_TRUE);
+        leLabelWidget_SetText(radio_id_eth_label_2, (leChar *)destination[1]);
+    }
+
+    if (count >= 3)
+    {
+        radio_id_eth_label_3->fn->setVisible(radio_id_eth_label_3, LE_TRUE);
+        leLabelWidget_SetText(radio_id_eth_label_3, (leChar *)destination[2]);
+    }
+
+    if (count >= 4)
+    {
+        radio_id_eth_label_4->fn->setVisible(radio_id_eth_label_4, LE_TRUE);
+        leLabelWidget_SetText(radio_id_eth_label_4, (leChar *)destination[3]);
+    }
+
+    if (count >= 5)
+    {
+        radio_id_eth_label_5->fn->setVisible(radio_id_eth_label_5, LE_TRUE);
+        leLabelWidget_SetText(radio_id_eth_label_5, (leChar *)destination[4]);
+    }
+}
+```
+
+### 2. Call it inside your Send button callback
+
+```
+void SendButton_Released(void)
+{
+    if (selectedInterface == INTERFACE_RADIO)
+    {
+        displayMulticastBuffer(IPAddr_line);
+    }
+    else if (selectedInterface == INTERFACE_ETHERNET)
+    {
+        displayMulticastBuffer(EthernetAddr_line);
+    }
+}
+```
+
+### 3. Expected output
+
+For buffer `12345|456|859|`:
+
+Multicast destination table
+
+| Destination |
+| ----------- |
+| 12345       |
+| 456         |
+| 859         |
+
+Only three destination labels are visible. Labels 4 and 5 remain hidden.
+
+Important: This assumes `IPAddr_line` and `EthernetAddr_line` are null-terminated `char` buffers and that your Legato project supports `leLabelWidget_SetText()`.
+
+The next step is to connect these destination labels to your SENT and DELIVERED status labels so each destination gets its own status.
+
+
+
+
+
+
+
+Understood. Now we will handle only the Add button and Multicast Address Book Done button.
+
+Both buttons will append data to the same interface buffer. The Send button will not be involved here.
+1. Common append function
+This function appends data without overwriting existing destinations.
+#define MAX_DESTINATIONS  5
+#define BUFFER_SIZE       128
+
+bool appendToMulticastBuffer(char *buffer, const char *data)
+{
+    uint8_t count = 0;
+    uint16_t i;
+    uint16_t len;
+
+    if (data == NULL || data[0] == '\0')
+        return false;
+
+    // Count existing destinations
+    for (i = 0; buffer[i] != '\0'; i++)
+    {
+        if (buffer[i] == '|')
+            count++;
+    }
+
+    if (count >= MAX_DESTINATIONS)
+        return false;
+
+    len = strlen(buffer);
+
+    if (len + strlen(data) + 2 >= BUFFER_SIZE)
+        return false;
+
+    // Append data
+    if (len > 0 && buffer[len - 1] != '|')
+        strcat(buffer, "|");
+
+    strcat(buffer, data);
+    strcat(buffer, "|");
+
+    return true;
+}
+
+
+2. Manual Add button
+void AddButton_Released(void)
+{
+    bool result = false;
+
+    if (selectedInterface == INTERFACE_RADIO)
+    {
+        result = appendToMulticastBuffer(IPAddr_line, input_buffer);
+    }
+    else if (selectedInterface == INTERFACE_ETHERNET)
+    {
+        result = appendToMulticastBuffer(EthernetAddr_line, input_buffer);
+    }
+
+    if (result == true)
+    {
+        // Clear manual entry after successful addition
+        memset(input_buffer, 0, sizeof(input_buffer));
+
+        // Clear your manual-entry text field here
+    }
+}
+
+
+3. Multicast Address Book Done button
+void MulticastDoneButton_Released(void)
+{
+    uint8_t i;
+    bool result;
+
+    if (selectedInterface == INTERFACE_RADIO)
+    {
+        for (i = 0; i < selectedRadioCount; i++)
+        {
+            result = appendToMulticastBuffer(
+                         IPAddr_line,
+                         selectedRadioIDs[i]);
+
+            if (result == false)
+                break;
+        }
+    }
+    else if (selectedInterface == INTERFACE_ETHERNET)
+    {
+        for (i = 0; i < selectedEthernetCount; i++)
+        {
+            result = appendToMulticastBuffer(
+                         EthernetAddr_line,
+                         selectedEthernetIPs[i]);
+
+            if (result == false)
+                break;
+        }
+    }
+
+    // Display the updated buffer
+    if (selectedInterface == INTERFACE_RADIO)
+    {
+        displayMulticastBuffer(IPAddr_line);
+    }
+    else if (selectedInterface == INTERFACE_ETHERNET)
+    {
+        displayMulticastBuffer(EthernetAddr_line);
+    }
+}
+
+
+4. Expected result
+For example:
+
+| Action | Buffer |
+|---|---|
+| Select Radio ID 12345 | 12345| |
+| Select Radio ID 456 | 12345|456| |
+| Click Add with 859 | 12345|456|859| |
+| Select Radio ID 789 | 12345|456|859|789| |
+Maximum 5 destinations
+Important: selectedRadioIDs[], selectedEthernetIPs[], selectedRadioCount, and selectedEthernetCount are placeholder names. Replace them with your actual Address Book selection variables. Also, this version assumes each Done callback receives only the newly selected entries; if it receives the entire selection again, we must prevent duplicate appending.
+
+Send me your actual Address Book selection variable names, and I can connect this directly to your MPLAB 6.25 callbacks.x
