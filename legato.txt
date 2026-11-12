@@ -1,0 +1,427 @@
+Complete MPLAB 6.25 Legato Graphics code – Multicast status display
+This is the complete code structure from the beginning, including:
+- Three column headings.
+- Five rows and three columns of labels.
+- Radio ID / Ethernet IP extraction from the multicast buffer.
+- Automatic row visibility based on the number of entries.
+- Initial PENDING status.
+- Automatic SUCCESS update after each successful transmission.
+- Automatic SUCCESS update after each corresponding FPGA ACK.
+GUI layout
+RADIO ID / ETHERNET
+
+
+SENT STATUS
+
+
+DELIVERED STATUS
+
+
+12345
+
+PENDING
+
+PENDING
+
+45
+
+PENDING
+
+PENDING
+
+2121
+
+PENDING
+
+PENDING
+
+859
+
+PENDING
+
+PENDING
+
+
+Example with four multicast entries. The fifth row remains hidden.
+1. Header files and global variables
+Add these at the beginning of your .c file.
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_ROWS 5
+#define BUFFER_SIZE 100
+
+// Multicast buffer
+char multicast_buffer[BUFFER_SIZE] =
+{
+    "12345|45|2121|859|"
+};
+
+// Total number of multicast entries
+int total_multicast_data = 0;
+
+// Status counters
+int sent_row_count = 0;
+int delivered_row_count = 0;
+
+
+For Ethernet, the buffer can contain:
+"1.2.5.4|45.12.2.3|"
+
+
+Use your existing multicast buffer instead of the example buffer.
+2. Create arrays for the 15 row labels
+Use the actual widget names generated in your Legato project.
+// First column: Radio ID / Ethernet IP
+
+leLabelWidget *data_labels[MAX_ROWS] =
+{
+    interface_screen_radio_eth_label_1,
+    interface_screen_radio_eth_label_2,
+    interface_screen_radio_eth_label_3,
+    interface_screen_radio_eth_label_4,
+    interface_screen_radio_eth_label_5
+};
+
+
+// Second column: Sent Status
+
+leLabelWidget *sent_labels[MAX_ROWS] =
+{
+    interface_screen_sent_status_label_1,
+    interface_screen_sent_status_label_2,
+    interface_screen_sent_status_label_3,
+    interface_screen_sent_status_label_4,
+    interface_screen_sent_status_label_5
+};
+
+
+// Third column: Delivered Status
+
+leLabelWidget *delivered_labels[MAX_ROWS] =
+{
+    interface_screen_delivered_status_label_1,
+    interface_screen_delivered_status_label_2,
+    interface_screen_delivered_status_label_3,
+    interface_screen_delivered_status_label_4,
+    interface_screen_delivered_status_label_5
+};
+
+
+3. Hide all three column headings initially
+Create three heading labels in Legato Designer:
+- interface_screen_heading_radio_eth
+- interface_screen_heading_sent_status
+- interface_screen_heading_delivered_status
+Set their text in the Designer to:
+- RADIO ID / ETHERNET
+- SENT STATUS
+- DELIVERED STATUS
+Add this function:
+void hide_multicast_headings(void)
+{
+    interface_screen_heading_radio_eth->fn->setVisible(
+        interface_screen_heading_radio_eth, LE_FALSE);
+
+    interface_screen_heading_sent_status->fn->setVisible(
+        interface_screen_heading_sent_status, LE_FALSE);
+
+    interface_screen_heading_delivered_status->fn->setVisible(
+        interface_screen_heading_delivered_status, LE_FALSE);
+}
+
+
+4. Display all three headings
+void show_multicast_headings(void)
+{
+    interface_screen_heading_radio_eth->fn->setVisible(
+        interface_screen_heading_radio_eth, LE_TRUE);
+
+    interface_screen_heading_sent_status->fn->setVisible(
+        interface_screen_heading_sent_status, LE_TRUE);
+
+    interface_screen_heading_delivered_status->fn->setVisible(
+        interface_screen_heading_delivered_status, LE_TRUE);
+}
+
+
+5. Hide all 15 row labels initially
+void hide_all_labels(void)
+{
+    int i;
+
+    for(i = 0; i < MAX_ROWS; i++)
+    {
+        data_labels[i]->fn->setVisible(
+            data_labels[i], LE_FALSE);
+
+        sent_labels[i]->fn->setVisible(
+            sent_labels[i], LE_FALSE);
+
+        delivered_labels[i]->fn->setVisible(
+            delivered_labels[i], LE_FALSE);
+    }
+}
+
+
+6. Extract multicast data and display in the first column
+This is the main function.
+
+It will:
+- Copy the multicast buffer.
+- Split the data using |.
+- Display each ID/IP in the first column.
+- Set both status columns to PENDING.
+- Display only the rows containing valid data.
+- Reset the status counters.
+void display_multicast_data(void)
+{
+    char temp_buffer[BUFFER_SIZE];
+    char *token;
+
+    int row = 0;
+
+    // Reset total entries and counters
+    total_multicast_data = 0;
+
+    sent_row_count = 0;
+    delivered_row_count = 0;
+
+    // Hide previous rows
+    hide_all_labels();
+
+    // Copy multicast buffer safely
+    strncpy(temp_buffer, multicast_buffer, BUFFER_SIZE - 1);
+    temp_buffer[BUFFER_SIZE - 1] = '\0';
+
+    // Extract first entry
+    token = strtok(temp_buffer, "|");
+
+    while(token != NULL && row < MAX_ROWS)
+    {
+        // Display Radio ID / Ethernet IP
+        data_labels[row]->fn->setString(
+            data_labels[row],
+            leString_CreateFromChar(token)
+        );
+
+        // Initial Sent Status
+        sent_labels[row]->fn->setString(
+            sent_labels[row],
+            leString_CreateFromChar("PENDING")
+        );
+
+        // Initial Delivered Status
+        delivered_labels[row]->fn->setString(
+            delivered_labels[row],
+            leString_CreateFromChar("PENDING")
+        );
+
+        // Show first column
+        data_labels[row]->fn->setVisible(
+            data_labels[row], LE_TRUE);
+
+        // Show second column
+        sent_labels[row]->fn->setVisible(
+            sent_labels[row], LE_TRUE);
+
+        // Show third column
+        delivered_labels[row]->fn->setVisible(
+            delivered_labels[row], LE_TRUE);
+
+        row++;
+
+        // Extract next entry
+        token = strtok(NULL, "|");
+    }
+
+    // Store total number of entries
+    total_multicast_data = row;
+}
+
+
+For example:
+
+Radio ID buffer
+"12345|45|2121|859|"
+
+
+Extracted entries:
+Row	First column
+1	12345
+2	45
+3	2121
+4	859
+5	Hidden
+
+Ethernet buffer
+"1.2.5.4|45.12.2.3|"
+
+
+Extracted entries:
+Row	First column
+1	1.2.5.4
+2	45.12.2.3
+3	Hidden
+4	Hidden
+5	Hidden
+
+7. Update Sent Status automatically
+Whenever one ID/IP is successfully transmitted to FPGA, call this function.
+void update_sent_status(void)
+{
+    if(sent_row_count < total_multicast_data)
+    {
+        sent_labels[sent_row_count]->fn->setString(
+            sent_labels[sent_row_count],
+            leString_CreateFromChar("SUCCESS")
+        );
+
+        sent_row_count++;
+    }
+}
+
+
+No need to pass the ID/IP or row number.
+
+The counter automatically updates the next row.
+8. Update Delivered Status automatically
+Whenever a valid corresponding ACK is received from FPGA, call this function.
+void update_delivered_status(void)
+{
+    if(delivered_row_count < total_multicast_data)
+    {
+        delivered_labels[delivered_row_count]->fn->setString(
+            delivered_labels[delivered_row_count],
+            leString_CreateFromChar("SUCCESS")
+        );
+
+        delivered_row_count++;
+    }
+}
+
+
+The first ACK updates row 1, second ACK updates row 2, and so on.
+9. Send button callback
+When the user clicks Send:
+1. Display all three headings.
+2. Extract multicast buffer data.
+3. Display the valid rows.
+4. Initialize the status columns.
+5. Start your existing FPGA transmission logic.
+void interface_screen_send_btn_released(
+    leButtonWidget *btn
+)
+{
+    // Display headings
+    show_multicast_headings();
+
+    // Extract and display multicast data
+    display_multicast_data();
+
+    // Start existing FPGA transmission logic
+    // Call your existing send function here
+}
+
+
+10. Integrate with your existing FPGA transmission code
+Inside your existing transmission logic:
+// After successful transmission of one ID/IP
+update_sent_status();
+
+
+Inside your existing UART3 ACK receive logic:
+// After receiving and validating corresponding ACK
+update_delivered_status();
+
+
+For your existing retry mechanism, call update_sent_status() only after successful transmission, and call update_delivered_status() only after a valid ACK.
+11. Initial screen initialization
+Call these functions when your screen is initialized or loaded.
+void interface_screen_show(void)
+{
+    // Hide headings
+    hide_multicast_headings();
+
+    // Hide all 15 row labels
+    hide_all_labels();
+}
+
+
+Use your actual screen initialization callback if it has a different name.
+12. Complete execution flow
+User clicks SEND
+
+show_multicast_headings()
+
+display_multicast_data()
+
+All valid rows displayed
+
+Sent = PENDING
+
+Delivered = PENDING
+
+Successful transmission
+
+update_sent_status()
+Next Sent row = SUCCESS
+
+Corresponding FPGA ACK
+
+update_delivered_status()
+Next Delivered row = SUCCESS
+
+Repeat for remaining entries
+
+13. Important points before executing
+1. The code assumes ACKs arrive in the same order as the IDs/IPs are transmitted.
+2. Your existing FPGA transmission function must call the Sent Status update after successful transmission.
+3. Your UART3 ACK handler must call the Delivered Status update after validating the ACK.
+4. If ACKs arrive in a different order, the counter approach needs modification.
+5. The example uses leLabelWidget and leString_CreateFromChar(); confirm these declarations and the setString() signature against your generated Legato headers.
+
+
+
+int validate_ip(const char *ip)
+{
+    int octet = 0;
+    int dots = 0;
+    int digits = 0;
+    int value = 0;
+
+    while(*ip != '\0')
+    {
+        if(*ip >= '0' && *ip <= '9')
+        {
+            value = (value * 10) + (*ip - '0');
+            digits++;
+
+            if(digits > 3 || value > 255)
+                return 0;
+        }
+        else if(*ip == '.')
+        {
+            if(digits == 0)
+                return 0;
+
+            dots++;
+            octet++;
+            digits = 0;
+            value = 0;
+        }
+        else
+        {
+            return 0;
+        }
+
+        ip++;
+    }
+
+    if(digits == 0)
+        return 0;
+
+    octet++;
+
+    return (octet == 4 && dots == 3);
+}
